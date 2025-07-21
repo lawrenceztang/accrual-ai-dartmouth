@@ -2,56 +2,35 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { supabase, StripeTransaction, JournalEntry, JournalEntryBatch } from '@/lib/supabase'
+import { supabase, StripeTransaction, JournalEntryBatch } from '@/lib/supabase'
 import { getUnmappedPrograms } from '@/lib/journal-mapper'
 
 export default function Dashboard() {
-  const [transactions, setTransactions] = useState<StripeTransaction[]>([])
   const [pendingTransactions, setPendingTransactions] = useState<StripeTransaction[]>([])
   const [journalEntryBatches, setJournalEntryBatches] = useState<JournalEntryBatch[]>([])
-  const [currentBatch, setCurrentBatch] = useState<any>(null)
+  const [currentBatch, setCurrentBatch] = useState<{
+    id: string
+    name: string
+    totalTransactions: number
+    totalAmount: number
+  } | null>(null)
   const [unmappedPrograms, setUnmappedPrograms] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
-
-  useEffect(() => {
-    const initializePage = async () => {
-      // First fetch existing data to show current batch immediately
-      await fetchData()
-      
-      // Then sync transactions from Stripe in the background
-      setStatusMessage('Syncing transactions from Stripe...')
-      try {
-        const response = await fetch('/api/sync-transactions', { method: 'POST' })
-        const result = await response.json()
-        setStatusMessage(result.message)
-        
-        // Refresh data after sync
-        await fetchData()
-      } catch (error) {
-        setStatusMessage('Error syncing transactions')
-      }
-    }
-    
-    initializePage()
-  }, [])
 
   const fetchData = async () => {
     setLoading(true)
     try {
       const [
-        transactionsResult, 
         pendingTransactionsResult,
         batchesResult, 
         unmappedResult
       ] = await Promise.all([
-        supabase.from('stripe_transactions').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('stripe_transactions').select('*').eq('processed', false).order('created_at', { ascending: false }),
         supabase.from('journal_entry_batches').select('*').order('created_at', { ascending: false }).limit(20),
         getUnmappedPrograms()
       ])
 
-      if (transactionsResult.data) setTransactions(transactionsResult.data)
       if (pendingTransactionsResult.data) setPendingTransactions(pendingTransactionsResult.data)
       if (batchesResult.data) {
         setJournalEntryBatches(batchesResult.data)
@@ -78,6 +57,28 @@ export default function Dashboard() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const initializePage = async () => {
+      // First fetch existing data to show current batch immediately
+      await fetchData()
+      
+      // Then sync transactions from Stripe in the background
+      setStatusMessage('Syncing transactions from Stripe...')
+      try {
+        const response = await fetch('/api/sync-transactions', { method: 'POST' })
+        const result = await response.json()
+        setStatusMessage(result.message)
+        
+        // Refresh data after sync
+        await fetchData()
+      } catch (error) {
+        setStatusMessage('Error syncing transactions')
+      }
+    }
+    
+    initializePage()
+  }, [])
 
 
 

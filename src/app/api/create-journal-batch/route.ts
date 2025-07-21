@@ -30,7 +30,12 @@ export async function POST() {
       .limit(1)
       .single()
 
-    let batch: any
+    let batch: {
+      id: string
+      batch_name: string
+      total_transactions: number
+      total_amount: number
+    }
 
     if (existingDraftBatch && !draftBatchError) {
       // Add to existing draft batch
