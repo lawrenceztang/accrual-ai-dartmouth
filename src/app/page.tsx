@@ -16,6 +16,7 @@ export default function Dashboard() {
   } | null>(null)
   const [unmappedPrograms, setUnmappedPrograms] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  const [batchActionLoading, setBatchActionLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
 
   const fetchData = useCallback(async () => {
@@ -110,7 +111,7 @@ export default function Dashboard() {
   }
 
   const downloadBatchExcel = async (batchId: string) => {
-    setLoading(true)
+    setBatchActionLoading(true)
     setStatusMessage('Generating Excel file...')
     try {
       const response = await fetch(`/api/download-batch-excel?batchId=${batchId}`)
@@ -133,12 +134,12 @@ export default function Dashboard() {
     } catch {
       setStatusMessage('Error downloading Excel file')
     } finally {
-      setLoading(false)
+      setBatchActionLoading(false)
     }
   }
 
   const completeBatch = async (batchId: string) => {
-    setLoading(true)
+    setBatchActionLoading(true)
     setStatusMessage('Marking journal entry batch as uploaded...')
     try {
       const response = await fetch('/api/complete-journal-batch', { 
@@ -158,12 +159,12 @@ export default function Dashboard() {
     } catch {
       setStatusMessage('Error marking journal entry batch as uploaded')
     } finally {
-      setLoading(false)
+      setBatchActionLoading(false)
     }
   }
 
   const cancelBatch = async (batchId: string) => {
-    setLoading(true)
+    setBatchActionLoading(true)
     setStatusMessage('Canceling journal entry batch...')
     try {
       const response = await fetch('/api/cancel-journal-batch', { 
@@ -183,7 +184,7 @@ export default function Dashboard() {
     } catch {
       setStatusMessage('Error canceling journal entry batch')
     } finally {
-      setLoading(false)
+      setBatchActionLoading(false)
     }
   }
 
@@ -247,20 +248,17 @@ export default function Dashboard() {
             <div className="flex space-x-3">
               <button
                 onClick={() => downloadBatchExcel(currentBatch.id)}
-                disabled={loading}
+                disabled={batchActionLoading}
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded shadow-sm"
               >
                 Download Excel
               </button>
               <button
                 onClick={() => completeBatch(currentBatch.id)}
-                disabled={loading}
-                className="bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 border border-gray-300 font-medium py-2 px-4 rounded shadow-sm flex items-center space-x-2"
+                disabled={batchActionLoading}
+                className="bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 border border-gray-300 font-medium py-2 px-4 rounded shadow-sm"
               >
-                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span>Journal Entry Uploaded</span>
+                I have uploaded the journal entry
               </button>
             </div>
             <button
@@ -276,7 +274,7 @@ export default function Dashboard() {
         <div className="mb-8">
           <button
             onClick={createJournalBatch}
-            disabled={loading || pendingTransactionCount === 0}
+            disabled={batchActionLoading || pendingTransactionCount === 0}
             className="bg-purple-500 hover:bg-purple-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded"
           >
             Create Journal Entry ({pendingTransactionCount})
