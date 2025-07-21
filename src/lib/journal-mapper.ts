@@ -1,4 +1,4 @@
-import { supabase, ProgramMapping, StripeTransaction, JournalEntry } from '@/lib/supabase'
+import { supabase, StripeTransaction, JournalEntry } from '@/lib/supabase'
 
 export interface JournalEntryData {
   debit_entity: string

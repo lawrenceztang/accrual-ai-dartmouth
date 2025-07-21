@@ -51,8 +51,8 @@ export default function Dashboard() {
         }
       }
       setUnmappedPrograms(unmappedResult)
-    } catch (error) {
-      console.error('Error fetching data:', error)
+    } catch {
+      console.error('Error fetching data')
     } finally {
       setLoading(false)
     }
@@ -72,13 +72,13 @@ export default function Dashboard() {
         
         // Refresh data after sync
         await fetchData()
-      } catch (error) {
+      } catch {
         setStatusMessage('Error syncing transactions')
       }
     }
     
     initializePage()
-  }, [])
+  }, [fetchData])
 
 
 
@@ -102,7 +102,7 @@ export default function Dashboard() {
       } else {
         setStatusMessage(result.message || 'Error creating journal entry batch')
       }
-    } catch (error) {
+    } catch {
       setStatusMessage('Error creating journal entry batch')
     } finally {
       setLoading(false)
@@ -130,7 +130,7 @@ export default function Dashboard() {
         const result = await response.json()
         setStatusMessage(result.message || 'Error generating Excel file')
       }
-    } catch (error) {
+    } catch {
       setStatusMessage('Error downloading Excel file')
     } finally {
       setLoading(false)
@@ -155,7 +155,7 @@ export default function Dashboard() {
       } else {
         setStatusMessage(result.message || 'Error marking journal entry batch as uploaded')
       }
-    } catch (error) {
+    } catch {
       setStatusMessage('Error marking journal entry batch as uploaded')
     } finally {
       setLoading(false)
@@ -180,7 +180,7 @@ export default function Dashboard() {
       } else {
         setStatusMessage(result.message || 'Error canceling journal entry batch')
       }
-    } catch (error) {
+    } catch {
       setStatusMessage('Error canceling journal entry batch')
     } finally {
       setLoading(false)

@@ -32,7 +32,7 @@ export function generateExcelFile(journalEntries: JournalEntryWithTransaction[])
   })
 
   // Process each transaction group
-  for (const [transactionId, entries] of groupedEntries) {
+  for (const [, entries] of groupedEntries) {
     // Add the debit and credit entries for this transaction
     entries.forEach(entry => {
       const amount = entry.amount / 100 // Convert from cents to dollars

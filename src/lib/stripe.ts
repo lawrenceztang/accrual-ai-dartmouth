@@ -65,7 +65,7 @@ export async function fetchStripeTransactions(
                 const programField = session.data[0].custom_fields.find(
                   field => field.key === 'program'
                 )
-                if (programField && programField.text) {
+                if (programField && programField.text && programField.text.value) {
                   programName = programField.text.value
                   console.log(`- Found program name in custom field: ${programName}`)
                 }
@@ -128,7 +128,7 @@ export async function getStripeTransaction(chargeId: string): Promise<StripePaym
             const programField = session.data[0].custom_fields.find(
               field => field.key === 'program'
             )
-            if (programField && programField.text) {
+            if (programField && programField.text && programField.text.value) {
               programName = programField.text.value
             }
           }
