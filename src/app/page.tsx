@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase, StripeTransaction, JournalEntryBatch } from '@/lib/supabase'
 import { getUnmappedPrograms } from '@/lib/journal-mapper'
@@ -18,7 +18,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const [
@@ -45,7 +45,7 @@ export default function Dashboard() {
             totalTransactions: draftBatch.total_transactions,
             totalAmount: draftBatch.total_amount
           })
-        } else if (currentBatch) {
+        } else {
           // Clear current batch if no draft batch exists
           setCurrentBatch(null)
         }
@@ -56,7 +56,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     const initializePage = async () => {
