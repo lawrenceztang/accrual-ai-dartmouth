@@ -1,12 +1,28 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase, ProgramMapping } from '@/lib/supabase'
+import * as XLSX from 'xlsx'
+
+interface ExcelMappingRow {
+  'PROGRAM NAME': string
+  'ENTITY': string
+  'ORG': string
+  'FUNDING': string
+  'ACTIVITY': string
+  'SUBACTIVITY': string
+  'NATURAL_CLASS': string
+  'DEBIT': string | number
+  'CREDIT': string | number
+}
 
 export default function MappingsPage() {
   const [mappings, setMappings] = useState<ProgramMapping[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingMapping, setEditingMapping] = useState<ProgramMapping | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState({
     program_name: '',
     debit_entity: '',
@@ -137,16 +153,202 @@ export default function MappingsPage() {
     })
   }
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setUploadStatus(null)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data, { type: 'array' })
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData: ExcelMappingRow[] = XLSX.utils.sheet_to_json(worksheet)
+
+      const mappingsToInsert = await processBulkMappings(jsonData)
+      
+      if (mappingsToInsert.length > 0) {
+        const { error } = await supabase
+          .from('program_mappings')
+          .upsert(mappingsToInsert, { 
+            onConflict: 'program_name',
+            ignoreDuplicates: false 
+          })
+
+        if (error) throw error
+
+        setUploadStatus(`Successfully uploaded ${mappingsToInsert.length} program mappings`)
+        fetchMappings()
+      } else {
+        setUploadStatus('No valid mappings found in the uploaded file')
+      }
+    } catch (error) {
+      console.error('Error processing file:', error)
+      setUploadStatus('Error processing file. Please check the format and try again.')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const processBulkMappings = async (rows: ExcelMappingRow[]): Promise<Partial<ProgramMapping>[]> => {
+    const mappingsMap = new Map<string, {
+      program_name: string
+      debit_entity: string
+      debit_org: string
+      debit_funding: string
+      debit_activity: string
+      debit_subactivity: string
+      debit_natural_class: string
+      credit_entity: string
+      credit_org: string
+      credit_funding: string
+      credit_activity: string
+      credit_subactivity: string
+      credit_natural_class: string
+    }>()
+
+    for (const row of rows) {
+      const programName = row['PROGRAM NAME']?.toString().trim()
+      if (!programName) continue
+
+      if (!mappingsMap.has(programName)) {
+        mappingsMap.set(programName, {
+          program_name: programName,
+          debit_entity: '',
+          debit_org: '',
+          debit_funding: '',
+          debit_activity: '',
+          debit_subactivity: '',
+          debit_natural_class: '',
+          credit_entity: '',
+          credit_org: '',
+          credit_funding: '',
+          credit_activity: '',
+          credit_subactivity: '',
+          credit_natural_class: '',
+        })
+      }
+
+      const mapping = mappingsMap.get(programName)!
+      
+      const hasDebit = row['DEBIT'] && row['DEBIT'].toString().trim() !== ''
+      const hasCredit = row['CREDIT'] && row['CREDIT'].toString().trim() !== ''
+
+      if (hasDebit) {
+        mapping.debit_entity = row['ENTITY']?.toString().trim() || ''
+        mapping.debit_org = row['ORG']?.toString().trim() || ''
+        mapping.debit_funding = row['FUNDING']?.toString().trim() || ''
+        mapping.debit_activity = row['ACTIVITY']?.toString().trim() || ''
+        mapping.debit_subactivity = row['SUBACTIVITY']?.toString().trim() || ''
+        mapping.debit_natural_class = row['NATURAL_CLASS']?.toString().trim() || ''
+      }
+
+      if (hasCredit) {
+        mapping.credit_entity = row['ENTITY']?.toString().trim() || ''
+        mapping.credit_org = row['ORG']?.toString().trim() || ''
+        mapping.credit_funding = row['FUNDING']?.toString().trim() || ''
+        mapping.credit_activity = row['ACTIVITY']?.toString().trim() || ''
+        mapping.credit_subactivity = row['SUBACTIVITY']?.toString().trim() || ''
+        mapping.credit_natural_class = row['NATURAL_CLASS']?.toString().trim() || ''
+      }
+    }
+
+    return Array.from(mappingsMap.values()).filter(mapping => 
+      mapping.program_name && 
+      (mapping.debit_entity || mapping.credit_entity)
+    )
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Program Mappings</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Add New Mapping
-        </button>
+        <div className="flex space-x-3">
+          <div className="relative">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".xlsx,.xls"
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="bg-green-500 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+            >
+              {uploading ? 'Uploading...' : 'Upload Excel'}
+            </button>
+          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Add New Mapping
+          </button>
+        </div>
+      </div>
+
+      {uploadStatus && (
+        <div className={`mb-6 p-4 rounded-lg ${
+          uploadStatus.includes('Successfully') 
+            ? 'bg-green-100 border border-green-400 text-green-700' 
+            : 'bg-red-100 border border-red-400 text-red-700'
+        }`}>
+          {uploadStatus}
+        </div>
+      )}
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <h3 className="text-lg font-medium text-blue-800 mb-2">Excel Upload Format</h3>
+        <p className="text-sm text-blue-700 mb-3">
+          Upload an Excel file with the following column headers. Each row should contain either a DEBIT or CREDIT value (not both):
+        </p>
+        <div className="bg-white p-3 rounded border overflow-x-auto">
+          <table className="text-xs text-gray-600">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left px-2">PROGRAM NAME</th>
+                <th className="text-left px-2">ENTITY</th>
+                <th className="text-left px-2">ORG</th>
+                <th className="text-left px-2">FUNDING</th>
+                <th className="text-left px-2">ACTIVITY</th>
+                <th className="text-left px-2">SUBACTIVITY</th>
+                <th className="text-left px-2">NATURAL_CLASS</th>
+                <th className="text-left px-2">DEBIT</th>
+                <th className="text-left px-2">CREDIT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="px-2 py-1">Spring LSI</td>
+                <td className="px-2 py-1">111111</td>
+                <td className="px-2 py-1">222222</td>
+                <td className="px-2 py-1">333333</td>
+                <td className="px-2 py-1">444444</td>
+                <td className="px-2 py-1">555555</td>
+                <td className="px-2 py-1">666666</td>
+                <td className="px-2 py-1">3000</td>
+                <td className="px-2 py-1"></td>
+              </tr>
+              <tr>
+                <td className="px-2 py-1">Spring LSI</td>
+                <td className="px-2 py-1">777777</td>
+                <td className="px-2 py-1">888888</td>
+                <td className="px-2 py-1">999999</td>
+                <td className="px-2 py-1">100000</td>
+                <td className="px-2 py-1">110000</td>
+                <td className="px-2 py-1">120000</td>
+                <td className="px-2 py-1"></td>
+                <td className="px-2 py-1">3000</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showForm && (
